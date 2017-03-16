@@ -91,7 +91,7 @@ class IiwaWsgTaskPanel(TaskUserPanel):
             # notes below are for a box long dimension aligned with
             # world Y (so if it were directly in front of the arm it
             # would have to be gripped from the side/top).
-            grasp_offsets  = [
+            grasp_offsets = [
                 # Approach the box from the right (when looking at the arm).
                 ((dims[0]/4.0, 0.0, 0.0), (-90, 180, 0)),
                 # Same as above, gripper flipper
@@ -107,10 +107,21 @@ class IiwaWsgTaskPanel(TaskUserPanel):
                 ((-dims[0]/4.0, 0.0, 0.0), (90, 0, 0)),
             ]
 
+            pregrasp_extra = 0.05
+            pregrasp_offsets = [
+                # Offset in the x direction (straight back)
+                (-(dims[0] / 2.0 + pregrasp_extra), 0., 0.),
+                # Offset along the z axis to slide along the box.
+                (0., 0., -(dims[0] / 2.0 + pregrasp_extra)),
+                (0., 0., (dims[0] / 2.0 + pregrasp_extra)),
+                ]
+
             for i, grasp_offset in enumerate(grasp_offsets):
-                iiwaplanning.makeGraspFrames(
-                    obj, grasp_offset, pregraspOffset=-(dims[0]/2.0 + 0.02),
-                    suffix=' %d' % i)
+                for j, pregrasp_offset in enumerate(pregrasp_offsets):
+                    iiwaplanning.makeGraspFrames(
+                        obj, grasp_offset,
+                        pregraspOffset=pregrasp_offset,
+                        suffix=' %d' % ((i * 100) + j))
             self.planner.setAffordanceName(target_name)
             self.planner.selectGraspFrameSuffix()
 
