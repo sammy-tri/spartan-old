@@ -459,7 +459,7 @@ def addBoxGraspFrames():
     obj = om.findObjectByName('box')
     dims = obj.getProperty('Dimensions')
     graspOffset = ([0.0, 0.0, dims[2]/2.0 - 0.025], [0,0,0])
-    makeGraspFrames(obj, graspOffset)
+    makeGraspFrames(obj, graspOffset, pregraspOffset=(0.0, 0.0, 0.08))
 
 
 def init(robotSystem_):
