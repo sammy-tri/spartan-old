@@ -63,10 +63,10 @@ class IiwaWsgTaskPanel(TaskUserPanel):
         optitrack_vis.connectRigidBodyListChanged(self.rigidBodyListChanged)
 
         self.params.addProperty(
-            'Frame 1', [0.8, 0.36, 0.30],
+            'Frame 1', [0.8, 0.36, 0.30, 0., 0., 0.],
             attributes=propertyset.PropertyAttributes(singleStep=0.01))
         self.params.addProperty(
-            'Frame 2', [0.8, -0.36, 0.30],
+            'Frame 2', [0.8, -0.36, 0.30, 0., 0., 0.],
             attributes=propertyset.PropertyAttributes(singleStep=0.01))
 
         self.addTasks()
@@ -112,8 +112,8 @@ class IiwaWsgTaskPanel(TaskUserPanel):
                 # Offset in the x direction (straight back)
                 (-(dims[0] / 2.0 + pregrasp_extra), 0., 0.),
                 # Offset along the z axis to slide along the box.
-                (0., 0., -(dims[0] / 2.0 + pregrasp_extra)),
-                (0., 0., (dims[0] / 2.0 + pregrasp_extra)),
+                (-dims[0] / 2.0, 0., -(dims[0] / 2.0 + pregrasp_extra)),
+                (-dims[0] / 2.0, 0., (dims[0] / 2.0 + pregrasp_extra)),
                 ]
 
             for i, grasp_offset in enumerate(grasp_offsets):
@@ -127,8 +127,8 @@ class IiwaWsgTaskPanel(TaskUserPanel):
 
     def addGraspFrameFromProperty(self, name):
         position = self.params.getProperty(name)
-        iiwaplanning.setBoxGraspTarget(position,
-                                       [0., 0., 0.],
+        iiwaplanning.setBoxGraspTarget(position[0:3],
+                                       position[3:6],
                                        self._default_target_dimensions)
         self.planner.setAffordanceName('box')
         self.planner.addGraspFrames()
