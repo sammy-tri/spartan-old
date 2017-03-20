@@ -52,9 +52,18 @@ class MyPlanner(object):
         iiwaplanning.addGraspFrames(self.getAffordanceName())
         self.selectGraspFrameSuffix()
 
+    def addBoxGraspFrames(self, graspOffset=None):
+        print "adding box grasp frames"
+        self.setAffordanceName('box')
+        iiwaplanning.addBoxGraspFrames(graspOffset=graspOffset)
+        self.selectGraspFrameSuffix()
+        print "grasp frame suffix", self.getGraspFrameSuffix()
+
     def selectGraspFrameSuffix(self):
         costs = iiwaplanning.computeReachPlanCosts(self.getAffordanceName())
+        print "costs", costs
         self.graspFrameSuffix = iiwaplanning.getBestGraspSuffix(costs)
+        return costs[self.graspFrameSuffix].isFeasible
 
     def planGrasp(self):
         suffix = self.getGraspFrameSuffix()
@@ -62,6 +71,7 @@ class MyPlanner(object):
 
     def planPreGrasp(self):
         suffix = self.getGraspFrameSuffix()
+        print "planning pregrasp for ", 'pregrasp to world%s' % suffix
         iiwaplanning.planReachGoal('pregrasp to world%s' % suffix)
 
     def commitManipPlan(self):

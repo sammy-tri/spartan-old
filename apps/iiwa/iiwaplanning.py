@@ -72,7 +72,7 @@ def getGraspToHandLink():
 
 _callbackId = None
 
-def planReachGoal(goalFrameName='reach goal', startPose=None, planTraj=True, interactive=False):
+def planReachGoal(goalFrameName='reach goal', startPose=None, planTraj=True, interactive=False, seedFromStart=False):
 
     goalFrame = om.findObjectByName(goalFrameName).transform
     startPoseName = 'reach_start'
@@ -97,9 +97,11 @@ def planReachGoal(goalFrameName='reach goal', startPose=None, planTraj=True, int
 
     isPregrasp = goalFrameName.startswith('pregrasp to world')
     isGrasp = goalFrameName.startswith('grasp to world')
+    if isGrasp:
+        seedFromStart = True
 
     # adjust bounds of move on line constraint
-    axisConstraintTubeRadius = 0.1 if isPregrasp else 0.0
+    axisConstraintTubeRadius = 0.3 if isPregrasp else 0.001
     axisConstraint.lowerBound[0] = -axisConstraintTubeRadius
     axisConstraint.lowerBound[0] = -axisConstraintTubeRadius
     axisConstraint.upperBound[1] = axisConstraintTubeRadius
@@ -135,19 +137,19 @@ def planReachGoal(goalFrameName='reach goal', startPose=None, planTraj=True, int
 
     constraints.append(p)
     constraints.append(q)
-    constraints.append(g)
-    constraints.append(g2)
+    #constraints.append(g)
+    #constraints.append(g2)
     constraints.append(axisConstraint)
 
     constraintSet = ikplanner.ConstraintSet(ikPlanner, constraints, endPoseName, startPoseName)
 
     constraintSet.ikParameters.usePointwise = True
-    if isPregrasp:
-        constraintSet.seedPoseName = 'q_nom'
-        constraintSet.nominalPoseName = 'q_nom'
-    elif isGrasp:
+    if seedFromStart:
         constraintSet.seedPoseName = startPoseName
         constraintSet.nominalPoseName = startPoseName
+    elif isPregrasp:
+        constraintSet.seedPoseName = 'q_nom'
+        constraintSet.nominalPoseName = 'q_nom'
 
     global _callbackId
     #if _callbackId:
@@ -414,6 +416,22 @@ def addGraspFrames(affordanceName='box'):
     dispatch[affordanceName]()
 
 
+def makePostGraspFrame(obj, graspFrameName):
+    graspFrame = om.findObjectByName(graspFrameName).transform
+    goalTransform = vtk.vtkTransform()
+    goalTransform.Translate(0, 0, 0.10)
+    # Copy the resulting matrix.  graspFrame can move around if the
+    # robot's frame moves when the gripper occludes the mocap.
+    goalTransform.SetMatrix(transformUtils.concatenateTransforms([
+        graspFrame, goalTransform]).GetMatrix())
+
+    goalFrameName = "postgrasp to world"
+    om.removeFromObjectModel(om.findObjectByName(goalFrameName))
+
+    goalFrame = vis.showFrame(goalTransform, goalFrameName, scale=0.1, parent=obj, visible=False)
+    obj.getChildFrame().getFrameSync().addFrame(goalFrame, ignoreIncoming=True)
+
+
 def makeGraspFrames(obj, graspOffset, pregraspOffset=(-0.08, 0, 0), suffix=''):
 
     pos, rpy = graspOffset
@@ -461,10 +479,11 @@ def addFunnelGraspFrames():
         makeGraspFrames(obj, graspOffset, suffix=' %d' % i)
 
 
-def addBoxGraspFrames():
+def addBoxGraspFrames(graspOffset=None):
     obj = om.findObjectByName('box')
-    dims = obj.getProperty('Dimensions')
-    graspOffset = ([0.0, 0.0, dims[2]/2.0 - 0.025], [0,0,0])
+    if graspOffset is None:
+        dims = obj.getProperty('Dimensions')
+        graspOffset = ([0.0, 0.0, dims[2]/2.0 - 0.025], [0,0,0])
     makeGraspFrames(obj, graspOffset, pregraspOffset=(0.0, 0.0, 0.08))
 
 

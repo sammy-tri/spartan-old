@@ -32,15 +32,29 @@ class UpdateGraspTargetTask(basictasks.AsyncTask):
         iiwaplanning.addGraspFrames()
 
 
+def getOffsets(dims):
+    finger_length = 0.050
+    x_offset = 0.0
+    if (dims[0] / 2.0) > finger_length:
+        x_offset = dims[0] / 4.0
+
+    y_offset = 0.0
+    if (dims[1] / 2.0) > finger_length:
+        y_offset = dims[1] / 4.0
+    return (x_offset, y_offset)
+
+
 class IiwaWsgTaskPanel(TaskUserPanel):
 
     rigid_body_target_name = 'Target rigid body'
     rigid_body_base_name = 'Base rigid body'
     rigid_body_base_none = '(none)'
+    place_target_name = 'Place target'
 
     def __init__(self, robotSystem, optitrack_vis):
         TaskUserPanel.__init__(self, windowTitle='Task Panel')
 
+        basictasks.robotSystem = robotSystem
         iiwaplanning.init(robotSystem)
         self.planner = myplanner.MyPlanner(robotSystem, self.params)
         self.ui.imageFrame.hide()
@@ -71,12 +85,16 @@ class IiwaWsgTaskPanel(TaskUserPanel):
         self.optitrack_vis = optitrack_vis
 
         self.params.addProperty(
-            'Frame 1', [0.8, 0.36, 0.30, 0., 0., 0.],
+            'Frame 1', [0.8, 0.36, 0.27, 0., 0., 0.],
             attributes=propertyset.PropertyAttributes(singleStep=0.01))
         self.params.addProperty(
-            'Frame 2', [0.8, -0.36, 0.30, 0., 0., 0.],
+            'Frame 2', [0.8, -0.36, 0.27, 0., 0., 0.],
             attributes=propertyset.PropertyAttributes(singleStep=0.01))
 
+        self.params.addProperty(
+            self.place_target_name, 0,
+            attributes=propertyset.PropertyAttributes(
+                enumNames=['Frame 1', 'Frame 2']))
         self.addTasks()
 
     def rigidBodyListChanged(self, body_list):
@@ -104,6 +122,8 @@ class IiwaWsgTaskPanel(TaskUserPanel):
             obj = om.findObjectByName(target_name)
             dims = obj.getProperty('Dimensions')
 
+            (x_offset, y_offset) = getOffsets(dims)
+
             # In the frames we're dealing with here, the gripper is
             # facing along the X axis. Left/right/above/etc in the
             # notes below are for a box long dimension aligned with
@@ -111,28 +131,41 @@ class IiwaWsgTaskPanel(TaskUserPanel):
             # would have to be gripped from the side/top).
             grasp_offsets = [
                 # Approach the box from the right (when looking at the arm).
-                ((dims[0]/4.0, 0.0, 0.0), (-90, 180, 0)),
-                # Same as above, gripper flipper
-                ((dims[0]/4.0, 0.0, 0.0), (90, 180, 0)),
-                # Attack from below, both gripper orientations.
-                ((0.0, dims[1]/4.0, 0.0), (-90, 180, 90)),
-                ((0.0, dims[1]/4.0, 0.0), (90, 180, 90)),
-                # Approach from above:
-                ((0.0, -dims[1]/4.0, 0.0), (-90, 0, 90)),
-                ((0.0, -dims[1]/4.0, 0.0), (90, 0, 90)),
+                ((x_offset, 0.0, 0.0), (-90, 180, 0)),
                 # Approach from the left
-                ((-dims[0]/4.0, 0.0, 0.0), (-90, 0, 0)),
-                ((-dims[0]/4.0, 0.0, 0.0), (90, 0, 0)),
+                ((-x_offset, 0.0, 0.0), (-90, 0, 0)),
             ]
 
-            pregrasp_extra = 0.05
+            allow_gripper_to_flip = False
+            if allow_gripper_to_flip:
+                grasp_offsets += [
+                    # Approach from right, gripper flipped
+                    ((x_offset, 0.0, 0.0), (90, 180, 0)),
+                    # Approach from left, gripper flipped
+                    ((-x_offset, 0.0, 0.0), (90, 0, 0)),
+                    ]
+
+            allow_y_grasps = False
+            if allow_y_grasps:
+                # Attack from below, both gripper orientations.
+                ((0.0, y_offset, 0.0), (-90, 180, 90)),
+                ((0.0, y_offset, 0.0), (90, 180, 90)),
+                # Approach from above:
+                ((0.0, -y_offset, 0.0), (-90, 0, 90)),
+                ((0.0, -y_offset, 0.0), (90, 0, 90)),                    
+            
+            pregrasp_extra = 0.08
             pregrasp_offsets = [
                 # Offset in the x direction (straight back)
                 (-(dims[0] / 2.0 + pregrasp_extra), 0., 0.),
                 # Offset along the z axis to slide along the box.
-                (-dims[0] / 2.0, 0., -(dims[0] / 2.0 + pregrasp_extra)),
-                (-dims[0] / 2.0, 0., (dims[0] / 2.0 + pregrasp_extra)),
+                (-(dims[0] / 2.0 + pregrasp_extra), 0., (dims[0] / 2.0 + pregrasp_extra)),
                 ]
+
+            if allow_y_grasps:
+                pregrasp_offsets += [
+                    (-dims[0] / 2.0, 0., -(dims[0] / 2.0 + pregrasp_extra)),
+                    ]
 
             for i, grasp_offset in enumerate(grasp_offsets):
                 for j, pregrasp_offset in enumerate(pregrasp_offsets):
@@ -141,15 +174,45 @@ class IiwaWsgTaskPanel(TaskUserPanel):
                         pregraspOffset=pregrasp_offset,
                         suffix=' %d' % ((i * 100) + j))
             self.planner.setAffordanceName(target_name)
-            self.planner.selectGraspFrameSuffix()
+            is_feasible = self.planner.selectGraspFrameSuffix()
+            if not is_feasible:
+                raise Exception('Infeasible task')
 
-    def addGraspFrameFromProperty(self, name):
+    def addGraspFrameFromProperty(self, name=None, use_grasped=False,
+                                  offset=(0, 0, 0)):
+        if name is None:
+            name = self.params.getPropertyEnumValue(self.place_target_name)
+
         position = self.params.getProperty(name)
-        iiwaplanning.setBoxGraspTarget(position[0:3],
-                                       position[3:6],
-                                       self._default_target_dimensions)
+        xyz = [position[i] + offset[i] for i in xrange(0, 3)]
+        rpy = position[3:6]
+        dims = self._default_target_dimensions
+
+        if use_grasped:
+            obj = om.findObjectByName(self.planner.getAffordanceName())
+            dims = obj.getProperty('Dimensions')
+            # TODO(sam.creasey) this is wrong we should get the
+            # rotation from somewhere.
+            #dims = [dims[1], dims[2], dims[0]]
+            dims = [dims[0], dims[2], dims[1]]
+            object_to_world = obj.getChildFrame().transform
+            grasp_to_world = om.findObjectByName(
+                'grasp to world%s' % self.planner.getGraspFrameSuffix()).transform
+            print "object to world", object_to_world.GetPosition(), object_to_world.GetOrientation()
+            print "grasp to world", grasp_to_world.GetPosition(), grasp_to_world.GetOrientation()
+
+        iiwaplanning.setBoxGraspTarget(xyz, rpy, dims)
         self.planner.setAffordanceName('box')
-        self.planner.addGraspFrames()
+        (x_offset, _) = getOffsets(dims)
+        print "dimensions", dims, "x_offset", x_offset
+        self.planner.addBoxGraspFrames(
+            graspOffset=([-x_offset, 0., dims[2]/2.], [0,0,0]))
+
+    def addPostGrasp(self):
+        obj = om.findObjectByName(self.planner.getAffordanceName())
+        iiwaplanning.makePostGraspFrame(
+            obj, 'grasp to world%s' % self.planner.getGraspFrameSuffix())
+
 
     def onPropertyChanged(self, propertySet, propertyName):
         print "property changed", propertyName, propertySet.getProperty(propertyName)
@@ -183,35 +246,47 @@ class IiwaWsgTaskPanel(TaskUserPanel):
             addFolder(name, parent=self.folder)
             addFunc(name, planFunc)
             addTask(basictasks.DelayTask(name='wait', delayTime=0.25))
+            addTask(basictasks.CheckPlanInfo())
             addFunc('execute', self.planner.commitManipPlan)
             addFunc('wait for execute', self.planner.waitForExecute)
             self.folder = old_folder
 
 
-        addFolder('pick and place 1->2')
-        addFunc('Target Frame 1',
-                functools.partial(self.addGraspFrameFromProperty, 'Frame 1'))
+        addFolder('pick and place mocap->frame')
+        addFunc('Target Rigid Body', self.addGraspFrameFromList)
+        # TODO(sam.creasey) Figure out how best to back off here.
+        addFunc('Target Backoff', self.addPostGrasp)
+        addFunc('open gripper', self.planner.openGripper)
         addPlanAndExecute('plan pregrasp', self.planner.planPreGrasp)
         addPlanAndExecute('plan grasp', self.planner.planGrasp)
         addFunc('close gripper', self.planner.closeGripper)
         addTask(basictasks.DelayTask(name='wait', delayTime=1.0))
-        addPlanAndExecute('plan prerelease', self.planner.planPreGrasp)
-        addFunc('Target Frame 2',
-                functools.partial(self.addGraspFrameFromProperty, 'Frame 2'))
+        addPlanAndExecute('plan backoff',
+                          functools.partial(iiwaplanning.planReachGoal,
+                                            goalFrameName='postgrasp to world',
+                                            seedFromStart=True))
+        addFunc('Target Frame',
+                functools.partial(self.addGraspFrameFromProperty, name=None,
+                                  use_grasped=True))
+        addFunc('Target Backoff', self.addPostGrasp)
         addPlanAndExecute('plan prerelease', self.planner.planPreGrasp)
         addPlanAndExecute('plan release', self.planner.planGrasp)
         addFunc('open gripper', self.planner.openGripper)
+        addPlanAndExecute('plan backoff',
+                          functools.partial(iiwaplanning.planReachGoal,
+                                            goalFrameName='postgrasp to world',
+                                            seedFromStart=True))
 
-        addFolder('pick and place 2->1')
-        addFunc('Target Frame 2',
-                functools.partial(self.addGraspFrameFromProperty, 'Frame 2'))
-        addPlanAndExecute('plan pregrasp', self.planner.planPreGrasp)
-        addPlanAndExecute('plan grasp', self.planner.planGrasp)
-        addFunc('close gripper', self.planner.closeGripper)
-        addTask(basictasks.DelayTask(name='wait', delayTime=1.0))
-        addPlanAndExecute('plan prerelease', self.planner.planPreGrasp)
-        addFunc('Target Frame 1',
-                functools.partial(self.addGraspFrameFromProperty, 'Frame 1'))
-        addPlanAndExecute('plan prerelease', self.planner.planPreGrasp)
-        addPlanAndExecute('plan release', self.planner.planGrasp)
-        addFunc('open gripper', self.planner.openGripper)
+        # addFolder('pick and place 2->1')
+        # addFunc('Target Frame 2',
+        #         functools.partial(self.addGraspFrameFromProperty, 'Frame 2'))
+        # addPlanAndExecute('plan pregrasp', self.planner.planPreGrasp)
+        # addPlanAndExecute('plan grasp', self.planner.planGrasp)
+        # addFunc('close gripper', self.planner.closeGripper)
+        # addTask(basictasks.DelayTask(name='wait', delayTime=1.0))
+        # addPlanAndExecute('plan prerelease', self.planner.planPreGrasp)
+        # addFunc('Target Frame 1',
+        #         functools.partial(self.addGraspFrameFromProperty, 'Frame 1'))
+        # addPlanAndExecute('plan prerelease', self.planner.planPreGrasp)
+        # addPlanAndExecute('plan release', self.planner.planGrasp)
+        # addFunc('open gripper', self.planner.openGripper)
