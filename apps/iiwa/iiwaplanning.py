@@ -1,3 +1,4 @@
+import math
 import os
 
 from director import robotstate
@@ -133,6 +134,7 @@ def planReachGoal(goalFrameName='reach goal', startPose=None, planTraj=True, int
 
 
     constraints.append(p)
+    constraints.append(q)
     constraints.append(g)
     constraints.append(g2)
     constraints.append(axisConstraint)
@@ -385,6 +387,19 @@ def fitObjectFromPolyData(polyData):
     return obj
 
 
+def setBoxGraspTarget(position, rpy, dimensions):
+    rot_quat = transformUtils.rollPitchYawToQuaternion(
+        [math.radians(x) for x in rpy])
+    t = transformUtils.transformFromPose(position, rot_quat)
+
+    om.removeFromObjectModel(om.findObjectByName('box'))
+    obj = makeBox()
+    obj.setProperty('Dimensions', dimensions)
+    obj.getChildFrame().copyFrame(t)
+    obj.setProperty('Surface Mode', 'Wireframe')
+    obj.setProperty('Color', [1,0,0])
+
+
 def addGraspFrames(affordanceName='box'):
     dispatch = {
         'box' : addBoxGraspFrames,
@@ -443,7 +458,7 @@ def addFunnelGraspFrames():
 def addBoxGraspFrames():
     obj = om.findObjectByName('box')
     dims = obj.getProperty('Dimensions')
-    graspOffset = ([0.0, 0.0, dims[2]/2.0 - 0.025], [0,50,0])
+    graspOffset = ([0.0, 0.0, dims[2]/2.0 - 0.025], [0,0,0])
     makeGraspFrames(obj, graspOffset)
 
 
@@ -475,7 +490,8 @@ def computeReachPlanCost(suffix):
     for goalName in goalNames:
         endPose, info = planReachGoal(goalName, startPose=endPose, planTraj=False)
         cost += computePoseCost(endPose)
-        if not robotSystem.planPlayback.isPlanInfoFeasible(info):
+        #if not robotSystem.planPlayback.isPlanInfoFeasible(info):
+        if not (0 <= info < 10):
             isFeasible = False
 
     return FieldContainer(cost=cost, isFeasible=isFeasible, endPose=endPose)

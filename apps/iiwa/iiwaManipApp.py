@@ -28,6 +28,8 @@ except ImportError:
     useOptitrackVisualizer = False
 
 
+from big_optitrackvisualizer import BigOptitrackVisualizer
+
 import PythonQt
 from PythonQt import QtCore, QtGui
 
@@ -253,13 +255,12 @@ roboturdf.addPathsFromPackageMap(packageMap)
 
 robotSystem = makeRobotSystem(view)
 
-
 # TODO: move this to director/robotsystem.py as optional feature
 if useOptitrackVisualizer:
-    optitrackVis = OptitrackVisualizer('OPTITRACK_FRAMES')
-    optitrackVis.setEnabled(True)
-    applogic.MenuActionToggleHelper('Tools', optitrackVis.name, optitrackVis.isEnabled, optitrackVis.setEnabled)
-
+    #optitrackVis = OptitrackVisualizer('OPTITRACK_FRAMES')
+    optitrackVis = BigOptitrackVisualizer('OPTITRACK_FRAMES')
+    #optitrackVis.setEnabled(True)
+    #applogic.MenuActionToggleHelper('Tools', optitrackVis.name, optitrackVis.isEnabled, optitrackVis.setEnabled)
 
 app.addWidgetToDock(robotSystem.teleopPanel.widget, QtCore.Qt.RightDockWidgetArea).hide()
 app.addWidgetToDock(robotSystem.playbackPanel.widget, QtCore.Qt.BottomDockWidgetArea).hide()
@@ -270,12 +271,17 @@ setGripperJointPositions(robotSystem.robotStateModel, 0.04)
 setGripperJointPositions(robotSystem.teleopRobotModel, 0.04)
 setGripperJointPositions(robotSystem.playbackRobotModel, 0.04)
 
-
 robotLinkSelector = robotlinkselector.RobotLinkSelector()
 viewBehaviors.addHandler(viewBehaviors.LEFT_DOUBLE_CLICK_EVENT, robotLinkSelector.onLeftDoubleClick)
 
 
-if havePerceptionDrivers():
+if True:
+    # sammy's hackery lives here
+    from iiwa_wsg_task_panel import IiwaWsgTaskPanel
+    taskPanel = IiwaWsgTaskPanel(robotSystem, optitrackVis)
+    taskPanel.planner.openGripperFunc = gripperOpen
+    taskPanel.planner.closeGripperFunc = gripperClose
+elif havePerceptionDrivers():
 
     import mytaskpanel
 

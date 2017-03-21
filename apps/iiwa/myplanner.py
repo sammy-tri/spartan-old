@@ -1,5 +1,6 @@
 from director import objectmodel as om
 from director import pointpicker
+from director.tasks import basictasks
 
 import iiwaplanning
 
@@ -70,7 +71,7 @@ class MyPlanner(object):
 
         plan = self.robotSystem.ikPlanner.lastManipPlan
         lastPlanTime = self.robotSystem.planPlayback.getPlanElapsedTime(plan)
-        yield rt.DelayTask(delayTime=lastPlanTime + 0.1).run()
+        yield basictasks.DelayTask(delayTime=lastPlanTime + 0.1).run()
 
     def openGripper(self):
         self.openGripperFunc()
