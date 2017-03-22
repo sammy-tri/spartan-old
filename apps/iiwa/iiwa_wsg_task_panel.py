@@ -2,6 +2,7 @@ import functools
 
 import director.objectmodel as om
 from director import propertyset
+from director import transformUtils
 from director.tasks import basictasks
 from director.tasks.taskuserpanel import TaskUserPanel
 
@@ -34,6 +35,8 @@ class UpdateGraspTargetTask(basictasks.AsyncTask):
 class IiwaWsgTaskPanel(TaskUserPanel):
 
     rigid_body_target_name = 'Target rigid body'
+    rigid_body_base_name = 'Base rigid body'
+    rigid_body_base_none = '(none)'
 
     def __init__(self, robotSystem, optitrack_vis):
         TaskUserPanel.__init__(self, windowTitle='Task Panel')
@@ -60,7 +63,12 @@ class IiwaWsgTaskPanel(TaskUserPanel):
         self.params.addProperty(
             self.rigid_body_target_name, 0,
             attributes=propertyset.PropertyAttributes(enumNames=[""]))
+        self.params.addProperty(
+            self.rigid_body_base_name, 0,
+            attributes=propertyset.PropertyAttributes(enumNames=[
+                self.rigid_body_base_none]))
         optitrack_vis.connectRigidBodyListChanged(self.rigidBodyListChanged)
+        self.optitrack_vis = optitrack_vis
 
         self.params.addProperty(
             'Frame 1', [0.8, 0.36, 0.30, 0., 0., 0.],
@@ -72,13 +80,23 @@ class IiwaWsgTaskPanel(TaskUserPanel):
         self.addTasks()
 
     def rigidBodyListChanged(self, body_list):
-        old_name = self.params.getPropertyEnumValue(self.rigid_body_target_name)
-        print "old selection", old_name
+        old_target_name = self.params.getPropertyEnumValue(
+            self.rigid_body_target_name)
         self.params.setProperty(self.rigid_body_target_name, 0)
         self.params.setPropertyAttribute(self.rigid_body_target_name, 'enumNames',
                                          body_list)
-        if old_name in body_list:
-            self.params.setProperty(self.rigid_body_target_name, old_name)
+        if old_target_name in body_list:
+            self.params.setProperty(self.rigid_body_target_name, old_target_name)
+
+        body_list = [self.rigid_body_base_none] + body_list
+        old_base_name = self.params.getPropertyEnumValue(
+            self.rigid_body_base_name)
+        self.params.setProperty(self.rigid_body_base_name, 0)
+        self.params.setPropertyAttribute(self.rigid_body_base_name, 'enumNames',
+                                         body_list)
+        # Because we will have started on '(none)'.
+        assert old_base_name in body_list
+        self.params.setProperty(self.rigid_body_base_name, old_base_name)
 
     def addGraspFrameFromList(self):
         target_name = self.params.getPropertyEnumValue(self.rigid_body_target_name)
@@ -135,6 +153,16 @@ class IiwaWsgTaskPanel(TaskUserPanel):
 
     def onPropertyChanged(self, propertySet, propertyName):
         print "property changed", propertyName, propertySet.getProperty(propertyName)
+
+        if propertyName == self.rigid_body_base_name:
+            rigid_body_base = self.params.getPropertyEnumValue(
+                self.rigid_body_base_name)
+            if rigid_body_base == self.rigid_body_base_none:
+                base_transform = self.optitrack_vis.defaultOptitrackToWorld
+            else:
+                base_transform = om.findObjectByName(
+                    rigid_body_base).getChildFrame().transform
+            self.optitrack_vis.setRobotBaseTransform(base_transform)
 
     def addTasks(self):
         # some helpers

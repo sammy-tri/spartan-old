@@ -9,6 +9,7 @@ from director import transformUtils
 from director.debugVis import DebugData
 from director.shallowCopy import shallowCopy
 from director.thirdparty import transformations
+from director import vtkAll as vtk
 
 from optitrack import optitrack_data_descriptions_t
 from optitrack import optitrack_frame_t
@@ -66,6 +67,9 @@ class BigOptitrackVisualizer(object):
 
     '''
 
+    defaultOptitrackToWorld = transformUtils.frameFromPositionAndRPY(
+        [0,0,0],[90,0,90])
+
     def __init__(self, channel="OPTITRACK_FRAMES",
                  desc_channel="OPTITRACK_DATA_DESCRIPTIONS"):
         self.channel = channel
@@ -84,7 +88,9 @@ class BigOptitrackVisualizer(object):
             "Unlabeled Markers", parentObj=self.getRootFolder())
         self.drawEdges = False
         self.markerGeometry = None
-        self.optitrackToWorld = transformUtils.frameFromPositionAndRPY([0,0,0],[90,0,90])
+        self.optitrackToWorld = vtk.vtkTransform()
+        self.optitrackToWorld.SetMatrix(
+            self.defaultOptitrackToWorld.GetMatrix())
         self.initSubscriber()
         self.callbacks = callbacks.CallbackRegistry([
             'RIGID_BODY_LIST_CHANGED',
@@ -138,6 +144,13 @@ class BigOptitrackVisualizer(object):
             return obj
 
         return [makeMarker(i) for i in marker_ids]
+
+    def setRobotBaseTransform(self, transform):
+        self.optitrackToWorld.Translate(transform.GetInverse().GetPosition())
+        # Move down a little to account for the fact that the markers
+        # aren't at the base of the robot.
+        self.optitrackToWorld.Translate(0, 0.025, 0)
+        # TODO(sam.creasey) handle rotation
 
     def _updateMarkerCollection(self, prefix, folder, marker_ids,
                                 positions, base_transform=None):
