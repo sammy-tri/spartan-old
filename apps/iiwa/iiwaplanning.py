@@ -95,8 +95,8 @@ def planReachGoal(goalFrameName='reach goal', startPose=None, planTraj=True, int
 
     axisConstraint.tspan = np.linspace(0,1,10)
 
-    isPregrasp = goalFrameName.startswith('pre')
-    #isPregrasp = False
+    isPregrasp = goalFrameName.startswith('pregrasp to world')
+    isGrasp = goalFrameName.startswith('grasp to world')
 
     # adjust bounds of move on line constraint
     axisConstraintTubeRadius = 0.1 if isPregrasp else 0.0
@@ -142,6 +142,12 @@ def planReachGoal(goalFrameName='reach goal', startPose=None, planTraj=True, int
     constraintSet = ikplanner.ConstraintSet(ikPlanner, constraints, endPoseName, startPoseName)
 
     constraintSet.ikParameters.usePointwise = True
+    if isPregrasp:
+        constraintSet.seedPoseName = 'q_nom'
+        constraintSet.nominalPoseName = 'q_nom'
+    elif isGrasp:
+        constraintSet.seedPoseName = startPoseName
+        constraintSet.nominalPoseName = startPoseName
 
     global _callbackId
     #if _callbackId:
@@ -419,7 +425,7 @@ def makeGraspFrames(obj, graspOffset, pregraspOffset=(-0.08, 0, 0), suffix=''):
 
     graspFrameName = 'grasp to world%s' % suffix
     pregraspFrameName = 'pregrasp to world%s' % suffix
-    
+
     om.removeFromObjectModel(om.findObjectByName(graspFrameName))
     om.removeFromObjectModel(om.findObjectByName(pregraspFrameName))
 
