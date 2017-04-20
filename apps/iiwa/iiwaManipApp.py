@@ -18,7 +18,6 @@ from director import fieldcontainer
 from director import framevisualization
 from director import drcargs
 
-
 try:
     from director.optitrackvisualizer import OptitrackVisualizer
     useOptitrackVisualizer = True
@@ -329,3 +328,7 @@ if useCorlDev:
 app.restoreDefaultWindowState()
 app.initWindowSettings()
 applogic.resetCamera(viewDirection=[-1,1,-0.5], view=view)
+
+#import big_optitrackvisualizer
+#optitrackVis.onDescMessage(big_optitrackvisualizer.test_desc_message)
+#optitrackVis.onMessage(big_optitrackvisualizer.test_message)

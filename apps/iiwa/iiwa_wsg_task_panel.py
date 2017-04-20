@@ -1,5 +1,6 @@
 import functools
 
+import director.objectmodel as om
 from director import propertyset
 from director.tasks import basictasks
 from director.tasks.taskuserpanel import TaskUserPanel
@@ -85,16 +86,31 @@ class IiwaWsgTaskPanel(TaskUserPanel):
             obj = om.findObjectByName(target_name)
             dims = obj.getProperty('Dimensions')
 
+            # In the frames we're dealing with here, the gripper is
+            # facing along the X axis. Left/right/above/etc in the
+            # notes below are for a box long dimension aligned with
+            # world Y (so if it were directly in front of the arm it
+            # would have to be gripped from the side/top).
             grasp_offsets  = [
-                ((dims[0]/4.0, dims[1]/8.0, 0.0), (-90, 180, 0)),
-                ((-dims[0]/4.0, dims[1]/8.0, 0.0), (-90, 180, 0)),
-                ((dims[0]/4.0, dims[1]/8.0, 0.0), (-90, 0, 0)),
-                ((-dims[0]/4.0, dims[1]/8.0, 0.0), (-90, 0, 0))
+                # Approach the box from the right (when looking at the arm).
+                ((dims[0]/4.0, 0.0, 0.0), (-90, 180, 0)),
+                # Same as above, gripper flipper
+                ((dims[0]/4.0, 0.0, 0.0), (90, 180, 0)),
+                # Attack from below, both gripper orientations.
+                ((0.0, dims[1]/4.0, 0.0), (-90, 180, 90)),
+                ((0.0, dims[1]/4.0, 0.0), (90, 180, 90)),
+                # Approach from above:
+                ((0.0, -dims[1]/4.0, 0.0), (-90, 0, 90)),
+                ((0.0, -dims[1]/4.0, 0.0), (90, 0, 90)),
+                # Approach from the left
+                ((-dims[0]/4.0, 0.0, 0.0), (-90, 0, 0)),
+                ((-dims[0]/4.0, 0.0, 0.0), (90, 0, 0)),
             ]
 
-            for i, grasp_offset in enumerate(graspOffsets):
-                iiwaplanning.makeGraspFrames(obj, grasp_offset,
-                                             suffix=' %d' % i)
+            for i, grasp_offset in enumerate(grasp_offsets):
+                iiwaplanning.makeGraspFrames(
+                    obj, grasp_offset, pregraspOffset=-(dims[0]/2.0 + 0.02),
+                    suffix=' %d' % i)
             self.planner.setAffordanceName(target_name)
             self.planner.selectGraspFrameSuffix()
 

@@ -15,6 +15,33 @@ from optitrack import optitrack_frame_t
 
 import numpy as np
 
+# Test code below
+from optitrack import optitrack_marker_set_t
+from optitrack import optitrack_marker_t
+from optitrack import optitrack_rigid_body_t
+from optitrack import optitrack_rigid_body_description_t
+
+test_message = optitrack_frame_t()
+
+body = optitrack_rigid_body_t()
+body.id = 100
+body.xyz = [-0.1, 0.3, 0.6]
+body.quat = [1., 0., 0., 0.]
+marker_xyz = [[0.1, 0.1, 0.0], [-0.1, 0.1, 0.02], [-0.1, -0.1, -0.0]]
+body.marker_xyz = [[xyz[0] + body.xyz[0], xyz[1] + body.xyz[1], xyz[2] + body.xyz[2]] for xyz in marker_xyz]
+body.marker_ids = [101, 102, 103]
+body.num_markers = len(body.marker_ids)
+test_message.rigid_bodies.append(body)
+test_message.num_rigid_bodies = len(test_message.rigid_bodies)
+
+test_desc_message = optitrack_data_descriptions_t()
+body_desc = optitrack_rigid_body_description_t()
+body_desc.name = "Foo"
+body_desc.id = 100
+test_desc_message.rigid_bodies.append(body_desc)
+test_desc_message.num_rigid_bodies = len(test_desc_message.rigid_bodies)
+
+
 class BigOptitrackVisualizer(object):
     '''
     Usage:
