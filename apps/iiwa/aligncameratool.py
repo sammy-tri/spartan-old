@@ -15,7 +15,7 @@ from director import vtkNumpy as vnp
 from director.shallowCopy import shallowCopy
 import numpy as np
 
-from director.tasks.taskuserpanel import ImageBasedAffordanceFit
+from director.tasks.imagebasedaffordancefit import ImageBasedAffordanceFit
 
 import PythonQt
 from PythonQt import QtGui, QtCore

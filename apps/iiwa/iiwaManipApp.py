@@ -280,6 +280,15 @@ if True:
     taskPanel = IiwaWsgTaskPanel(robotSystem, optitrackVis)
     taskPanel.planner.openGripperFunc = gripperOpen
     taskPanel.planner.closeGripperFunc = gripperClose
+
+    if havePerceptionDrivers():
+        imageManager = initImageManager()
+        openniDepthPointCloud = initDepthPointCloud(imageManager, view)
+        cameraView = newCameraView(imageManager)
+
+        frameVisPanel = framevisualization.FrameVisualizationPanel(view)
+        app.addWidgetToDock(frameVisPanel.widget, QtCore.Qt.RightDockWidgetArea).hide()
+
 elif havePerceptionDrivers():
 
     import mytaskpanel
