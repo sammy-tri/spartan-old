@@ -41,7 +41,12 @@ def getOffsets(dims):
     y_offset = 0.0
     if (dims[1] / 2.0) > finger_length:
         y_offset = dims[1] / 4.0
-    return (x_offset, y_offset)
+
+    z_offset = 0.0
+    if (dims[2] / 2.0) > finger_length:
+        z_offset = dims[2] / 4.0
+
+    return (x_offset, y_offset, z_offset)
 
 
 class IiwaWsgTaskPanel(TaskUserPanel):
@@ -122,7 +127,7 @@ class IiwaWsgTaskPanel(TaskUserPanel):
             obj = om.findObjectByName(target_name)
             dims = obj.getProperty('Dimensions')
 
-            (x_offset, y_offset) = getOffsets(dims)
+            (x_offset, y_offset, z_offset) = getOffsets(dims)
 
             # In the frames we're dealing with here, the gripper is
             # facing along the X axis. Left/right/above/etc in the
@@ -136,7 +141,11 @@ class IiwaWsgTaskPanel(TaskUserPanel):
                 ((-x_offset, 0.0, 0.0), (-90, 0, 0)),
             ]
 
+            target_lower = target_name.lower()
             allow_gripper_to_flip = False
+            if target_lower.count('box') or target_lower.count('cube'):
+                allow_gripper_to_flip = True
+
             if allow_gripper_to_flip:
                 grasp_offsets += [
                     # Approach from right, gripper flipped
@@ -146,14 +155,34 @@ class IiwaWsgTaskPanel(TaskUserPanel):
                     ]
 
             allow_y_grasps = False
+            if target_lower.count('box') or target_lower.count('cube'):
+                allow_y_grasps = True
             if allow_y_grasps:
-                # Attack from below, both gripper orientations.
-                ((0.0, y_offset, 0.0), (-90, 180, 90)),
-                ((0.0, y_offset, 0.0), (90, 180, 90)),
-                # Approach from above:
-                ((0.0, -y_offset, 0.0), (-90, 0, 90)),
-                ((0.0, -y_offset, 0.0), (90, 0, 90)),                    
-            
+                grasp_offsets += [
+                    # Attack from below, both gripper orientations.
+                    ((0.0, y_offset, 0.0), (-90, 180, 90)),
+                    ((0.0, y_offset, 0.0), (90, 180, 90)),
+                    # Approach from above:
+                    ((0.0, -y_offset, 0.0), (-90, 0, 90)),
+                    ((0.0, -y_offset, 0.0), (90, 0, 90)),
+                    ]
+
+            allow_side_grasps = False
+            if target_lower.count('cylinder') or target_lower.count('cube'):
+                allow_side_grasps = True
+            if allow_side_grasps:
+                grasp_offsets =+ [
+                    ((0.0, 0.0, z_offset), (-90, 90, 0)),
+                    ((0.0, 0.0, -z_offset), (-90, -90, 0)),
+                ]
+                if allow_gripper_to_flip:
+                    grasp_offsets =+ [
+                        ((0.0, 0.0, z_offset), (90, 90, 0)),
+                        ((0.0, 0.0, -z_offset), (90, -90, 0)),
+                ]
+
+
+
             pregrasp_extra = 0.08
             pregrasp_offsets = [
                 # Offset in the x direction (straight back)
@@ -203,7 +232,7 @@ class IiwaWsgTaskPanel(TaskUserPanel):
 
         iiwaplanning.setBoxGraspTarget(xyz, rpy, dims)
         self.planner.setAffordanceName('box')
-        (x_offset, _) = getOffsets(dims)
+        (x_offset, _, _) = getOffsets(dims)
         print "dimensions", dims, "x_offset", x_offset
         self.planner.addBoxGraspFrames(
             graspOffset=([-x_offset, 0., dims[2]/2.], [0,0,0]))
