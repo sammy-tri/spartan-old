@@ -171,12 +171,12 @@ class IiwaWsgTaskPanel(TaskUserPanel):
             if target_lower.count('cylinder') or target_lower.count('cube'):
                 allow_side_grasps = True
             if allow_side_grasps:
-                grasp_offsets =+ [
+                grasp_offsets += [
                     ((0.0, 0.0, z_offset), (-90, 90, 0)),
                     ((0.0, 0.0, -z_offset), (-90, -90, 0)),
                 ]
                 if allow_gripper_to_flip:
-                    grasp_offsets =+ [
+                    grasp_offsets += [
                         ((0.0, 0.0, z_offset), (90, 90, 0)),
                         ((0.0, 0.0, -z_offset), (90, -90, 0)),
                 ]
